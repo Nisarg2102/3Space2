@@ -1,11 +1,11 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import ParallaxBackground from "@/components/ParallaxBackground";
 import styles from "@/styles/Contact.module.css";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 
 import {
   FaLinkedinIn,
@@ -18,6 +18,8 @@ import {
   FaUser,
   FaEnvelope,
   FaBuilding,
+  FaCircleCheck,
+  FaCircleExclamation,
 } from "react-icons/fa6";
 
 import {
@@ -38,7 +40,14 @@ export default function ContactPage() {
   });
 
   const [status, setStatus] = useState<"idle" | "sending" | "sent">("idle");
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
+
+  useEffect(() => {
+    if (toast) {
+      const timer = setTimeout(() => setToast(null), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [toast]);
 
   const handleChange = (
     e: React.ChangeEvent<
@@ -46,7 +55,6 @@ export default function ContactPage() {
     >
   ) => {
     const { name, value } = e.target;
-    setErrorMessage(null);
 
     setForm((prev) => ({
       ...prev,
@@ -58,7 +66,6 @@ export default function ContactPage() {
     e.preventDefault();
 
     setStatus("sending");
-    setErrorMessage(null);
 
     try {
       const response = await fetch("/api/contact", {
@@ -74,17 +81,16 @@ export default function ContactPage() {
       if (!response.ok) {
         if (data.errors) {
           const errorMessages = Object.values(data.errors).flat().join(", ");
-          setErrorMessage(`Validation failed: ${errorMessages}`);
+          setToast({ message: `Validation failed: ${errorMessages}`, type: "error" });
         } else {
-          setErrorMessage(data.message || "Failed to submit inquiry");
+          setToast({ message: data.message || "Failed to submit inquiry", type: "error" });
         }
         setStatus("idle");
         return;
       }
 
-      console.log(data);
-
       setStatus("sent");
+      setToast({ message: data.message || "Your message was saved successfully.", type: "success" });
 
       setForm({
         name: "",
@@ -95,7 +101,7 @@ export default function ContactPage() {
       });
     } catch (error: any) {
       console.error("Contact form error:", error);
-      setErrorMessage(error.message || "Something went wrong.");
+      setToast({ message: error.message || "Something went wrong.", type: "error" });
       setStatus("idle");
     }
   };
@@ -567,6 +573,52 @@ export default function ContactPage() {
           </div>
         </section>
       </main>
+
+      {/* Toast Notification */}
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            className={styles.toastOverlay}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setToast(null)}
+          >
+            <motion.div
+              className={`${styles.toastCard} ${
+                toast.type === "success"
+                  ? styles.toastSuccess
+                  : styles.toastError
+              }`}
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              transition={{ type: "spring", damping: 25, stiffness: 300 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <span className={styles.toastIconWrapper}>
+                {toast.type === "success" ? (
+                  <FaCircleCheck size={32} />
+                ) : (
+                  <FaCircleExclamation size={32} />
+                )}
+              </span>
+              <h3 className={styles.toastTitle}>
+                {toast.type === "success"
+                  ? "Message Sent!"
+                  : "Something went wrong"}
+              </h3>
+              <p className={styles.toastMessage}>{toast.message}</p>
+              <button
+                className={styles.toastBtn}
+                onClick={() => setToast(null)}
+              >
+                OK
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <Footer />
     </>
